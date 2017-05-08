@@ -1,0 +1,104 @@
+/********************
+* * * * DOCS * * * *
+*********************/
+html,
+body {
+  width: 100%;
+  height: 100%;
+  font-size: 12px; }
+
+body {
+  padding: 20px 0; }
+
+button {
+  margin-bottom: 10px; }
+
+section {
+  margin-bottom: 10px;
+  border: 2px solid #90939b;
+  border-radius: 4px;
+  padding: 5px; }
+
+.month {
+  display: block;
+  background: #90939b;
+  color: #ffffff;
+  padding: 0; }
+  .month h6 {
+    padding: 8px 10px 0 10px;
+    font-size: 20px;
+    font-weight: 100; }
+  .month ul {
+    display: block;
+    background: #d0d3db;
+    font-size: 11px;
+    width: 100%;
+    min-width: 260px; }
+    .month ul > .week {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-around;
+      align-items: stretch; }
+      .month ul > .week > .cell {
+        display: block;
+        position: relative;
+        width: 200px;
+        min-height: 40px;
+        line-height: 40px;
+        text-align: center;
+        padding: 4px;
+        box-sizing: border-box;
+        text-align: right; }
+      .month ul > .week .cell + .cell {
+        border-left: 1px solid #d0d3db; }
+      .month ul > .week:first-child {
+        background: #90939b;
+        color: #ffffff; }
+        .month ul > .week:first-child > .cell {
+          height: 20px;
+          line-height: 12px;
+          border-color: #90939b; }
+    .month ul .week + .week {
+      border-top: 1px solid #d0d3db; }
+  .month .day {
+    background: #ffffff;
+    color: #111111; }
+    .month .day.active {
+      background: #fff79a;
+      cursor: pointer; }
+      .month .day.active:hover {
+        background: blue;
+        color: white; }
+    .month .day > .num {
+      display: block;
+      position: relative;
+      line-height: 12px;
+      text-align: right; }
+    .month .day > .hours {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      text-align: center;
+      transform: translate3d(-50%, -50%, 0px); }
+  .month .tasks {
+    display: block;
+    position: relative;
+    padding: 3px 0;
+    line-height: 0;
+    text-align: right; }
+    .month .tasks > .task {
+      display: inline-block;
+      position: relative;
+      background: #444;
+      width: 6px;
+      height: 6px;
+      margin: 0 2px 2px 0;
+      border-radius: 3px;
+      /*
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            left: 3px; 
+            top: 3px;
+            */ }

@@ -1,0 +1,16 @@
+{
+    "name": "hash",
+    "description": "hash",
+    "main": "hash.js",
+    "license": "ISC",
+    "homepage": "https://actarian.github.io/hash/",
+    "private": true,
+    "ignore": [
+        "**/.*",
+        "node_modules",
+        "bower_components",
+        "test",
+        "tests"
+    ],
+    "dependencies": {}
+}

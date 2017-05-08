@@ -1,0 +1,132 @@
+/********************
+* * * * DOCS * * * *
+*********************/
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    font-size: 12px;
+}
+
+body {
+    padding: 20px 0;
+}
+
+button {
+    margin-bottom: 10px;
+}
+
+$background: #90939b;
+$positive: #111111;
+$negative: #ffffff;
+$border: #90939b;
+$idle: #d0d3db;
+$active: #fff79a;
+section {
+    margin-bottom: 10px;
+    border: 2px solid $border;
+    border-radius: 4px;
+    padding: 5px;
+}
+
+.month {
+    display: block;
+    background: $background;
+    color: $negative;
+    padding: 0;
+    h6 {
+        padding: 8px 10px 0 10px;
+        font-size: 20px;
+        font-weight: 100;
+    }
+    ul {
+        display: block;
+        background: $idle;
+        font-size: 11px;
+        width: 100%;
+        min-width: 260px;
+        &>.week {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-around;
+            align-items: stretch;
+            &>.cell {
+                display: block;
+                position: relative;
+                width: 200px;
+                min-height: 40px;
+                line-height: 40px;
+                text-align: center;
+                padding: 4px;
+                // border: 1px solid $idle;
+                box-sizing: border-box;
+                text-align: right;
+            }
+            .cell+.cell {
+                border-left: 1px solid $idle;
+            }
+            &:first-child {
+                background: $background;
+                color: $negative;
+                &>.cell {
+                    height: 20px;
+                    line-height: 12px;
+                    border-color: $border;
+                }
+            }
+        }
+        .week+.week {
+            border-top: 1px solid $idle;
+        }
+    }
+    .day {
+        background: $negative;
+        color: $positive;
+        &.active {
+            background: $active;
+            cursor: pointer;
+            &:hover {
+                background: blue;
+                color: white;
+            }
+        }
+        &>.num {
+            display: block;
+            position: relative;
+            line-height: 12px;
+            text-align: right;
+        }
+        &>.hours {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            text-align: center;
+            transform: translate3d(-50%, -50%, 0px);
+        }
+    }
+    .tasks {
+        display: block;
+        position: relative;
+        padding: 3px 0;
+        line-height: 0;
+        text-align: right;
+        &>.task {
+            display: inline-block;
+            position: relative;
+            background: #444;
+            width: 6px;
+            height: 6px;
+            margin: 0 2px 2px 0;
+            border-radius: 3px;
+            /*
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            left: 3px; 
+            top: 3px;
+            */
+        }
+    }
+}
