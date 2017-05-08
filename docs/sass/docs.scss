@@ -23,6 +23,7 @@ $negative: #ffffff;
 $border: #90939b;
 $idle: #d0d3db;
 $active: #fff79a;
+$hover: #03a9f4;
 section {
     margin-bottom: 10px;
     border: 2px solid $border;
@@ -58,7 +59,7 @@ section {
                 min-height: 40px;
                 line-height: 40px;
                 text-align: center;
-                padding: 4px;
+                padding: 20px 4px 4px 4px;
                 // border: 1px solid $idle;
                 box-sizing: border-box;
                 text-align: right;
@@ -70,9 +71,10 @@ section {
                 background: $background;
                 color: $negative;
                 &>.cell {
-                    height: 20px;
+                    min-height: 25px;
                     line-height: 12px;
                     border-color: $border;
+                    padding-top: 4px;
                 }
             }
         }
@@ -87,15 +89,22 @@ section {
             background: $active;
             cursor: pointer;
             &:hover {
-                background: blue;
+                background: $hover;
                 color: white;
+                .task {
+                    background: $negative;
+                }
             }
         }
         &>.num {
             display: block;
-            position: relative;
-            line-height: 12px;
-            text-align: right;
+            position: absolute;
+            min-width: 16px;
+            height: 16px;
+            right: 3px;
+            top: 3px;
+            text-align: center;
+            line-height: 16px;
         }
         &>.hours {
             display: none;
@@ -104,6 +113,13 @@ section {
             left: 50%;
             text-align: center;
             transform: translate3d(-50%, -50%, 0px);
+        }
+        &.today {
+            &>.num {
+                background: red;
+                color: #fff;
+                border-radius: 9px;
+            }
         }
     }
     .tasks {
@@ -116,10 +132,10 @@ section {
             display: inline-block;
             position: relative;
             background: #444;
-            width: 6px;
-            height: 6px;
-            margin: 0 2px 2px 0;
-            border-radius: 3px;
+            width: 4px;
+            height: 4px;
+            margin: 0 2px 3px 0;
+            border-radius: 2px;
             /*
             width: 6px;
             height: 6px;

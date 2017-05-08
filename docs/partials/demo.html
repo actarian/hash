@@ -62,7 +62,7 @@
     </section>
     <!-- months -->
     <section class="month" ng-repeat="month in row.months track by $index">
-        <json-formatter json="month"></json-formatter>
+        <!-- <json-formatter json="month"></json-formatter> -->
         <h6>
             <b ng-bind="month.date | date : 'MMMM'"></b>
             <span ng-bind="month.date | date : 'yyyy'"></span>
@@ -78,11 +78,11 @@
                 <span class="cell">dom</span>
             </li>
             <li class="week" ng-repeat="week in month.weeks track by $index">
-                <div class="cell" ng-class="{ day: day, active: day.hours }" ng-repeat="day in week.days track by $index">
+                <div class="cell" ng-class="{ day: day, active: day.hours, today: day.$today }" ng-repeat="day in week.days track by $index">
                     <span class="num" ng-bind="day.d"></span>
                     <span class="hours" ng-bind="day.hours" ng-if="day.hours"></span>
                     <div class="tasks">
-                        <span class="task" title="{{task.taskId}}" ng-repeat="task in day.tasks track by $index" ng-style="{ width: (task.hours * 6) + 'px' }"></span>
+                        <span class="task" title="{{task.taskId}}" ng-repeat="task in day.tasks track by $index" ng-style="{ width: (task.hours * 4) + 'px' }"></span>
                         <!-- <span class="task" title="{{task.taskId}}" ng-repeat="task in day.tasks track by $index" ng-style="{ width: (12.5 * task.hours) + '%', top: (40 / day.tasks.length * $index) + 'px', height: (40 / day.tasks.length) + 'px', opacity: 1 / (day.tasks.length + 1) * ($index + 1)  }"></span> -->
                     </div>
                 </div>

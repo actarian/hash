@@ -46,7 +46,7 @@ section {
         min-height: 40px;
         line-height: 40px;
         text-align: center;
-        padding: 4px;
+        padding: 20px 4px 4px 4px;
         box-sizing: border-box;
         text-align: right; }
       .month ul > .week .cell + .cell {
@@ -55,9 +55,10 @@ section {
         background: #90939b;
         color: #ffffff; }
         .month ul > .week:first-child > .cell {
-          height: 20px;
+          min-height: 25px;
           line-height: 12px;
-          border-color: #90939b; }
+          border-color: #90939b;
+          padding-top: 4px; }
     .month ul .week + .week {
       border-top: 1px solid #d0d3db; }
   .month .day {
@@ -67,13 +68,19 @@ section {
       background: #fff79a;
       cursor: pointer; }
       .month .day.active:hover {
-        background: blue;
+        background: #03a9f4;
         color: white; }
+        .month .day.active:hover .task {
+          background: #ffffff; }
     .month .day > .num {
       display: block;
-      position: relative;
-      line-height: 12px;
-      text-align: right; }
+      position: absolute;
+      min-width: 16px;
+      height: 16px;
+      right: 3px;
+      top: 3px;
+      text-align: center;
+      line-height: 16px; }
     .month .day > .hours {
       display: none;
       position: absolute;
@@ -81,6 +88,10 @@ section {
       left: 50%;
       text-align: center;
       transform: translate3d(-50%, -50%, 0px); }
+    .month .day.today > .num {
+      background: red;
+      color: #fff;
+      border-radius: 9px; }
   .month .tasks {
     display: block;
     position: relative;
@@ -91,10 +102,10 @@ section {
       display: inline-block;
       position: relative;
       background: #444;
-      width: 6px;
-      height: 6px;
-      margin: 0 2px 2px 0;
-      border-radius: 3px;
+      width: 4px;
+      height: 4px;
+      margin: 0 2px 3px 0;
+      border-radius: 2px;
       /*
             width: 6px;
             height: 6px;

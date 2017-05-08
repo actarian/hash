@@ -11,23 +11,6 @@ app.controller('DemoCtrl', ['$scope', '$interval', 'Hash', 'Calendar', 'GanttRow
         },
     }, []);
 
-    function getRandomItem() {
-        var random = getRandom();
-        var day = getRandomDay();
-        var item = $scope.item = {
-            id: random,
-            hours: 1 + Math.floor(Math.random() * 6),
-            date: new Date(day.date),
-            dKey: day.dKey,
-            mKey: day.mKey,
-            activityId: row.activity.id,
-        };
-        if (Math.floor(Math.random() * 3) == 0) {
-            item.taskId = 10000 + Math.floor(Math.random() * 3);
-        }
-        return item;
-    }
-
     $scope.addItem = function() {
         var item = getRandomItem();
         row.slots.add(item);
@@ -69,29 +52,6 @@ app.controller('DemoCtrl', ['$scope', '$interval', 'Hash', 'Calendar', 'GanttRow
         }
     };
 
-    function getRandom() {
-        return 1000000 + Math.floor(Math.random() * 100000);
-    }
-
-    function getRandomDay() {
-        const oneday = (24 * 60 * 60 * 1000);
-        var date = new Date();
-        date.setDate(date.getDate() + Math.floor(Math.random() * 10));
-        date.setMonth(date.getMonth() + Math.floor(Math.random() * 2));
-        date.setHours(0);
-        date.setMinutes(0);
-        date.setSeconds(0);
-        var yyyy = date.getFullYear();
-        var MM = date.getMonth();
-        var dayKey = Math.ceil(date.getTime() / oneday);
-        var monthKey = yyyy * 12 + MM;
-        return {
-            dKey: dayKey,
-            mKey: monthKey,
-            date: serializeDate(date)
-        };
-    }
-
     function serializeDate(date) {
         function pad(v, s, z) {
             v = (v || 0) + '';
@@ -106,6 +66,46 @@ app.controller('DemoCtrl', ['$scope', '$interval', 'Hash', 'Calendar', 'GanttRow
         var mm = date.getMinutes();
         var ss = date.getSeconds();
         return yyyy + '-' + pad(MM) + '-' + pad(dd) + 'T' + pad(hh) + ':' + pad(mm) + ':' + pad(ss);
+    }
+
+    function getRandom() {
+        return 1000000 + Math.floor(Math.random() * 100000);
+    }
+
+    function getRandomDay() {
+        const oneday = (24 * 60 * 60 * 1000);
+        var date = new Date();
+        date.setDate(date.getDate() + Math.floor(Math.random() * 60));
+        // date.setMonth(date.getMonth() + Math.floor(Math.random() * 2));
+        date.setHours(0);
+        date.setMinutes(0);
+        date.setSeconds(0);
+        var yyyy = date.getFullYear();
+        var MM = date.getMonth();
+        var dayKey = Math.ceil(date.getTime() / oneday);
+        var monthKey = yyyy * 12 + MM;
+        return {
+            dKey: dayKey,
+            mKey: monthKey,
+            date: serializeDate(date)
+        };
+    }
+
+    function getRandomItem() {
+        var random = getRandom();
+        var day = getRandomDay();
+        var item = $scope.item = {
+            id: random,
+            hours: 1 + Math.floor(Math.random() * 6),
+            date: new Date(day.date),
+            dKey: day.dKey,
+            mKey: day.mKey,
+            activityId: row.activity.id,
+        };
+        if (Math.floor(Math.random() * 3) == 0) {
+            item.taskId = 10000 + Math.floor(Math.random() * 3);
+        }
+        return item;
     }
 
     function log() {
@@ -591,6 +591,12 @@ app.factory('Calendar', ['Hash', function(Hash) {
         });
     };
     Calendar.getMonth = function(day) {
+        today = new Date();
+        today.setHours(0);
+        today.setMinutes(0);
+        today.setSeconds(0);
+        todayKey = Math.ceil(today.getTime() / oneday);
+        //
         var date = Calendar.getDate(day);
         var yyyy = date.getFullYear();
         var MM = date.getMonth();
@@ -617,6 +623,7 @@ app.factory('Calendar', ['Hash', function(Hash) {
                         var date = new Date(yyyy, MM, d + 1);
                         var dKey = Math.ceil(date.getTime() / oneday);
                         item = {
+                            $today: dKey === todayKey,
                             c: c,
                             r: r,
                             d: d + 1,
