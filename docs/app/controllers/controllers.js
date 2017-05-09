@@ -8,6 +8,11 @@ app.controller('DemoCtrl', ['$scope', '$interval', 'Hash', 'Calendar', 'GanttRow
         activity: {
             id: 1000000 + random,
             name: 'Activity',
+            budgetHours: 10 + Math.floor(Math.random() * 50),
+        },
+        project: {
+            type: Math.floor(Math.random() * 5),
+            deliveryDate: new Date(),
         },
     }, []);
 
@@ -82,11 +87,11 @@ app.controller('DemoCtrl', ['$scope', '$interval', 'Hash', 'Calendar', 'GanttRow
         date.setSeconds(0);
         var yyyy = date.getFullYear();
         var MM = date.getMonth();
-        var dayKey = Math.ceil(date.getTime() / oneday);
-        var monthKey = yyyy * 12 + MM;
+        var key = Math.ceil(date.getTime() / oneday);
+        var mKey = yyyy * 12 + MM;
         return {
-            dKey: dayKey,
-            mKey: monthKey,
+            key: key,
+            mKey: mKey,
             date: serializeDate(date)
         };
     }
@@ -98,9 +103,9 @@ app.controller('DemoCtrl', ['$scope', '$interval', 'Hash', 'Calendar', 'GanttRow
             id: random,
             hours: 1 + Math.floor(Math.random() * 6),
             date: new Date(day.date),
-            dKey: day.dKey,
+            key: day.key,
             mKey: day.mKey,
-            activityId: row.activity.id,
+            activityId: row.id,
         };
         if (Math.floor(Math.random() * 3) == 0) {
             item.taskId = 10000 + Math.floor(Math.random() * 3);
@@ -125,18 +130,35 @@ app.constant('ganttGroups', {
 });
 
 app.factory('GanttRow', ['Hash', 'Calendar', 'ganttGroups', function(Hash, Calendar, ganttGroups) {
+    const oneday = (24 * 60 * 60 * 1000);
+    var today = new Date();
+    today.setHours(0);
+    today.setMinutes(0);
+    today.setSeconds(0);
+    var todayKey = Math.ceil(today.getTime() / oneday);
+
     function GanttRow(data, colors) {
         this.type = ganttGroups.ACTIVITY;
-        this.id = data.activity.id;
-        this.name = data.activity.name;
-        this.budgetHours = data.activity.budgetHours;
+        this.color = colors[this.color || 0];
         this.assignedHours = 0;
         this.slots = new Hash('id');
-        this.days = new Hash('dKey');
+        this.days = new Hash('key');
         this.months = new Hash('mKey');
         this.ranges = new Hash('rKey');
-        angular.isObject(data) ? angular.extend(this, data) : null;
-        this.color = colors[this.color || 0];
+        this.tasks = new Hash('taskId');
+        // angular.isObject(data) ? angular.extend(this, data) : null;
+        if (data) {
+            this.id = data.activity.id;
+            this.name = data.activity.name;
+            this.budgetHours = data.activity.budgetHours;
+            this.useBudget = data.project.type !== 2 && data.project.type !== 4;
+            this.customer = data.customer;
+            this.department = data.department;
+            this.manager = data.manager;
+            this.project = data.project;
+            this.resource = data.resource;
+        }
+        // this.items = new Hash().fill(data.items);
         this.update();
     }
     GanttRow.prototype = {
@@ -152,44 +174,19 @@ app.factory('GanttRow', ['Hash', 'Calendar', 'ganttGroups', function(Hash, Calen
             slots.each(function(item) {
                 total += item ? item.hours : 0;
                 var day = days.add({
-                    dKey: item.dKey,
+                    key: item.key,
                     date: item.date,
                     hours: 0,
                 });
                 day.tasks = day.tasks || new Hash('taskId');
-                day.tasks.push(item);
-                day.tasks.forEach(function(item) {
-                    day.hours += item.hours;
+                day.tasks.add(item);
+                day.tasks.each(function(task) {
+                    day.hours += task.hours;
                 });
             });
             days.forward(); // sort by key       
             this.assignedHours = total;
             this.updateRanges();
-        },
-        updateRanges: function() {
-            var days = this.days,
-                ranges = this.ranges;
-            ranges.removeAll();
-            var rKey = 0,
-                lastDay;
-            days.each(function(day, i) {
-                if (lastDay) {
-                    if (day.dKey - lastDay.dKey > 1 || day.tasks.differs(lastDay.tasks)) {
-                        rKey++;
-                    }
-                }
-                lastDay = day;
-                var range = ranges.add({
-                    rKey: rKey,
-                    hours: 0,
-                });
-                range.days = range.days || [];
-                range.days.push(day);
-                range.days.forEach(function(day) {
-                    range.hours += day.hours;
-                });
-            });
-            ranges.forward(); // sort by key   
         },
         updateMonths: function() {
             var days = this.days,
@@ -203,7 +200,7 @@ app.factory('GanttRow', ['Hash', 'Calendar', 'ganttGroups', function(Hash, Calen
                     Calendar.clearMonth(month);
                 }
                 months.add(month);
-                var day = month.days.getId(item.dKey);
+                var day = month.days.getId(item.key);
                 if (day) {
                     day.hours = item.hours;
                     day.tasks = item.tasks;
@@ -211,48 +208,118 @@ app.factory('GanttRow', ['Hash', 'Calendar', 'ganttGroups', function(Hash, Calen
             });
             months.forward(); // sort by key  
         },
-        assign: function(col, value) {
-            var items = this.items,
-                item = null,
-                key = col.$key;
-            var hash = this.getKey(key);
-            if (value) {
-                item = {
-                    key: key,
-                    date: col.$date,
-                    hours: value,
-                    activityId: this.id,
-                };
-                items.push(item);
-                hash.push(item);
-            } else {
-                angular.forEach(hash, function(item) {
-                    item.hours = 0;
-                    var i = items.indexOf(item);
-                    if (i !== -1) {
-                        items.splice(i, 1);
+        updateRanges: function() {
+            var days = this.days,
+                ranges = this.ranges;
+            ranges.removeAll();
+            var rKey = 0,
+                lastDay;
+            days.each(function(day, i) {
+                if (lastDay) {
+                    if (day.key - lastDay.key > 1 || day.tasks.differs(lastDay.tasks)) {
+                        rKey++;
                     }
+                }
+                lastDay = day;
+                var range = ranges.add({
+                    rKey: rKey,
                 });
+                range.days = range.days || [];
+                range.days.push(day.key);
+            });
+            ranges.forward(); // sort by key   
+        },
+        getRange: function(col, from, to) {
+            var ranges = this.ranges,
+                range = null,
+                key = col.$key;
+            ranges.each(function(item) {
+                var index = item.days.indexOf(key);
+                if (index !== -1) {
+                    item.c = index;
+                    item.firstKey = Math.max(from, item.days[0]);
+                    item.lastKey = Math.min(to, item.days[item.days.length - 1]);
+                    range = item;
+                }
+            });
+            return range;
+        },
+        updateRange: function(col, from, to) {
+            var ranges = this.ranges,
+                range = this.getRange(col, from, to);
+            if (range) {
+                range.previousKey = null;
+                range.nextKey = null;
+                var r = range.rKey;
+                if (r > 0) {
+                    var p = ranges[r - 1];
+                    range.previousKey = p.days[p.days.length - 1];
+                }
+                if (r < ranges.length - 1) {
+                    var n = ranges[r + 1];
+                    range.nextKey = n.days[0];
+                }
             }
+            return range;
+        },
+        canMoveRange: function(range, dir) {
+            // rifare !!!
+            var can = true;
+            var row = this;
+            var first = range.items[0];
+            var last = range.items[range.items.length - 1];
+            var key = row.getOffsetKey(first.startDate, dir);
+            var i = 0,
+                t = range.items.length;
+            while (i < t) {
+                var k = key + i;
+                if (k < todayKey || (row.days.getId(k) && range.items.indexOf(row.days.getId(k)) === -1)) { // sistemare!!
+                    can = false;
+                    i = t;
+                }
+                i++;
+            }
+            return can;
+        },
+        moveRange: function(range, dir) {
+            if (range.items.length) {
+                var row = this;
+                if (row.canMoveRange(range, dir)) {
+                    angular.forEach(range.items, function(item) {
+                        row.addDays(item, dir);
+                    });
+                    row.update();
+                }
+            }
+        },
+        assign: function(col, value) {
+            var slots = this.slots,
+                key = col.$key;
+            var item = {
+                key: key,
+                date: col.$date,
+                hours: value || 0,
+                activityId: this.id,
+            };
+            value ? slots.add(item) : slots.remove(item);
             this.update();
-            return hash;
+            return this.days.getId(key);
         },
         write: function(col, value, max) {
             value = Math.min(value, max);
-            value = Math.min(value, this.budgetHours - this.assignedHours);
+            this.useBudget ? value = Math.min(value, this.budgetHours - this.assignedHours) : null;
             value = Math.max(0, value);
-            if (value && !this.hasKey(col.$key) && col.$date >= today) {
+            if (value && !this.days.has(col.$key) && col.$date >= today) {
                 return this.assign(col, value);
             }
         },
         erase: function(col, value, max) {
-            if (this.hasKey(col.$key) && col.$date >= today) {
+            if (this.days.has(col.$key) && col.$date >= today) {
                 return this.assign(col, null);
             }
         },
         toggle: function(col, value, max) {
-            // console.log('toggle', col.$key, value, this.getRange(col));
-            if (this.hasKey(col.$key)) {
+            if (this.days.has(col.$key)) {
                 return this.erase(col, value, max);
             } else {
                 return this.write(col, value, max);
@@ -272,74 +339,12 @@ app.factory('GanttRow', ['Hash', 'Calendar', 'ganttGroups', function(Hash, Calen
             var key = Math.ceil(date.getTime() / oneday);
             return key;
         },
-        canMoveRange: function(range, dir) {
-            var can = true;
-            var row = this;
-            var first = range.items[0];
-            var last = range.items[range.items.length - 1];
-            var key = row.getOffsetKey(first.startDate, dir);
-            var i = 0,
-                t = range.items.length;
-            while (i < t) {
-                var k = key + i;
-                if (k < todayKey || (row.hashtable[k] && range.items.indexOf(row.hashtable[k]) === -1)) { // sistemare!!
-                    can = false;
-                    i = t;
-                }
-                i++;
-            }
-            return can;
-        },
-        moveRange: function(range, dir) {
-            if (range.items.length) {
-                var row = this;
-                if (row.canMoveRange(range, dir)) {
-                    angular.forEach(range.items, function(item) {
-                        row.addDays(item, dir);
-                    });
-                    row.update();
-                }
-            }
-        },
-        getRange: function(col) {
-            var range = null;
-            angular.forEach(this.ranges, function($range, $r) {
-                if ($range.indexOf(col.$key) !== -1) {
-                    range = $range;
-                }
-            });
-            return range;
-        },
-        getRangeInfo: function(col) {
-            var item = null,
-                ranges = this.ranges;
-            angular.forEach(ranges, function($range, $r) {
-                var index = $range.indexOf(col.$key);
-                if (index !== -1) {
-                    item = {
-                        colIndex: index,
-                        rangeIndex: $r,
-                        range: $range,
-                        previousRangeIndex: null,
-                        nextRangeIndex: null,
-                    };
-                    if ($r > 0) {
-                        var previous = ranges[$r - 1];
-                        item.previousRangeIndex = previous[previous.length - 1];
-                    }
-                    if ($r < ranges.length - 1) {
-                        var next = ranges[$r + 1];
-                        item.nextRangeIndex = next[0];
-                    }
-                }
-            });
-            return item;
-        },
         getHours: function(key) {
             var hours = 0;
-            if (this.hasKey(key)) {
-                angular.forEach(this.getKey(key), function(item) {
-                    hours += item.hours;
+            var day = this.days.getId(key);
+            if (day) {
+                day.tasks.each(function(task) {
+                    hours += task.hours;
                 });
             }
             return hours;
@@ -355,9 +360,7 @@ app.factory('GanttRow', ['Hash', 'Calendar', 'ganttGroups', function(Hash, Calen
             this.items.sort(function(a, b) {
                 return a.key - b.key;
             });
-            var item = Utils.where(this.items, {
-                key: key
-            });
+            var item = null; // Utils.where(this.items, { key: key });
             item = item || this.items[0];
             var index = this.items.indexOf(item);
             var i = index,
@@ -382,6 +385,7 @@ app.factory('GanttRow', ['Hash', 'Calendar', 'ganttGroups', function(Hash, Calen
     return GanttRow;
 }]);
 
+
 app.factory('Hash', [function() {
     var pools = {};
 
@@ -403,9 +407,12 @@ app.factory('Hash', [function() {
         });
     }
 
+    function has(key) {
+        return this.pool[key] !== undefined;
+    }
+
     function getId(key) {
-        var pool = this.pool;
-        return pool[key];
+        return this.pool[key];
     }
 
     function get(item) {
@@ -542,6 +549,7 @@ app.factory('Hash', [function() {
         return pools[pool] = (pools[pool] || {});
     };
     Hash.prototype = new Array;
+    Hash.prototype.has = has;
     Hash.prototype.getId = getId;
     Hash.prototype.get = get;
     Hash.prototype.set = set;
@@ -600,7 +608,7 @@ app.factory('Calendar', ['Hash', function(Hash) {
         var date = Calendar.getDate(day);
         var yyyy = date.getFullYear();
         var MM = date.getMonth();
-        var dKey = Math.ceil(date.getTime() / oneday);
+        var key = Math.ceil(date.getTime() / oneday);
         var mKey = yyyy * 12 + MM;
         var month = months.getId(mKey);
         if (!month) {
@@ -613,7 +621,7 @@ app.factory('Calendar', ['Hash', function(Hash) {
                 month: MM,
                 monthDays: monthDays,
                 fromDay: fromDay,
-                days: new Hash('dKey'),
+                days: new Hash('key'),
             };
             month.weeks = ArrayFrom(weeks, function(r) {
                 var days = ArrayFrom(7, function(c) {
@@ -621,14 +629,14 @@ app.factory('Calendar', ['Hash', function(Hash) {
                     var d = r * 7 + c - (fromDay - 1);
                     if (d >= 0 && d < monthDays) {
                         var date = new Date(yyyy, MM, d + 1);
-                        var dKey = Math.ceil(date.getTime() / oneday);
+                        var key = Math.ceil(date.getTime() / oneday);
                         item = {
-                            $today: dKey === todayKey,
+                            $today: key === todayKey,
                             c: c,
                             r: r,
                             d: d + 1,
                             date: date,
-                            dKey: dKey,
+                            key: key,
                             hours: 0,
                             tasks: [],
                         };
