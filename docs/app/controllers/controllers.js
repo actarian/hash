@@ -2,11 +2,9 @@
 
 app.controller('DemoCtrl', ['$scope', '$interval', 'Hash', 'Calendar', 'GanttRow', function($scope, $interval, Hash, Calendar, GanttRow) {
 
-    var random = getRandom();
-
     var row = $scope.row = new GanttRow({
         activity: {
-            id: 1000000 + random,
+            id: 1000000 + getRandom(),
             name: 'Activity',
             budgetHours: 10 + Math.floor(Math.random() * 50),
         },
@@ -21,25 +19,28 @@ app.controller('DemoCtrl', ['$scope', '$interval', 'Hash', 'Calendar', 'GanttRow
         row.slots.add(item);
         row.update();
         row.updateMonths();
+        $scope.item = item;
+        // console.log('addItem', item.id);
         log('addItem', item.id);
     };
     $scope.updateItem = function() {
         if ($scope.item) {
             var id = $scope.item.id;
-            var item = getRandomItem();
+            item = getRandomItem();
             item = angular.extend($scope.item, item);
             item.id = id;
             row.slots.add(item);
             row.update();
             row.updateMonths();
+            $scope.item = item;
             log('updateItem', item.id);
         }
     };
     $scope.clearItems = function() {
-        row.slots.removeAll();
-        row.days.removeAll();
-        row.months.removeAll();
         row.ranges.removeAll();
+        row.months.removeAll();
+        row.days.removeAll();
+        row.slots.removeAll();
         row.update();
         row.updateMonths();
         delete $scope.item;
@@ -96,11 +97,12 @@ app.controller('DemoCtrl', ['$scope', '$interval', 'Hash', 'Calendar', 'GanttRow
         };
     }
 
+    var uid = 1;
+
     function getRandomItem() {
-        var random = getRandom();
         var day = getRandomDay();
-        var item = $scope.item = {
-            id: random,
+        var item = {
+            id: uid,
             hours: 1 + Math.floor(Math.random() * 6),
             date: new Date(day.date),
             key: day.key,
@@ -110,6 +112,7 @@ app.controller('DemoCtrl', ['$scope', '$interval', 'Hash', 'Calendar', 'GanttRow
         if (Math.floor(Math.random() * 3) == 0) {
             item.taskId = 10000 + Math.floor(Math.random() * 50);
         }
+        uid++;
         return item;
     }
 
@@ -179,7 +182,7 @@ app.factory('GanttRow', ['Hash', 'Calendar', 'ganttGroups', function(Hash, Calen
                     hours: 0,
                 });
                 day.tasks = day.tasks || new Hash('taskId');
-                day.tasks.add(item);
+                day.tasks.add(angular.copy(item));
                 day.tasks.each(function(task) {
                     day.hours += task.hours;
                 });
@@ -293,9 +296,11 @@ app.factory('GanttRow', ['Hash', 'Calendar', 'ganttGroups', function(Hash, Calen
             }
         },
         assign: function(col, value) {
+            console.log('assign');
             var slots = this.slots,
                 key = col.$key;
             var item = {
+                // errore
                 key: key,
                 date: col.$date,
                 hours: value || 0,
@@ -392,27 +397,31 @@ app.factory('Hash', [function() {
     function Hash(key, pool) {
         key = key || 'id';
         pool = pool ? Hash.get(pool) : {};
-        Object.defineProperty(this, 'key', {
-            value: key,
-            enumerable: false
-        });
-        Object.defineProperty(this, 'pool', {
-            value: pool,
-            enumerable: false
-        });
-        Object.defineProperty(this, 'length', {
-            value: 0,
-            enumerable: false,
-            writable: true
+        Object.defineProperties(this, {
+            key: {
+                value: key,
+                enumerable: false,
+                writable: false
+            },
+            pool: {
+                value: pool,
+                enumerable: false,
+                writable: false
+            },
+            length: {
+                value: 0,
+                enumerable: false,
+                writable: true
+            }
         });
     }
 
     function has(id) {
-        return this.pool[id] !== undefined;
+        return this.pool[id + ''] !== undefined;
     }
 
     function getId(id) {
-        return this.pool[id];
+        return this.pool[id + ''];
     }
 
     function get(item) {
@@ -425,7 +434,7 @@ app.factory('Hash', [function() {
         var hash = this,
             pool = this.pool,
             key = this.key;
-        pool[item[key]] = item;
+        pool[item[key] + ''] = item;
         hash.push(item);
         return item;
     }
@@ -434,7 +443,10 @@ app.factory('Hash', [function() {
         var hash = this;
         var item = hash.get(newItem);
         if (item) {
-            angular.extend(item, newItem);
+            for (var i = 0, keys = Object.keys(newItem), p; i < keys.length; i++) {
+                p = keys[i];
+                item[p] = newItem[p];
+            }
         } else {
             item = hash.set(newItem);
         }
@@ -445,6 +457,7 @@ app.factory('Hash', [function() {
         var hash = this,
             pool = this.pool,
             key = this.key;
+        /*
         var index = -1;
         hash.each(function(item, i) {
             if (item[key] === oldItem[key]) {
@@ -455,16 +468,6 @@ app.factory('Hash', [function() {
             hash.splice(index, 1);
             delete pool[oldItem[key]];
         }
-        /*
-        if (oldItem) {
-            key = oldItem[key];
-            oldItem = pool[key];
-            var index = hash.indexOf(oldItem);
-            if (index !== -1) {
-                hash.splice(index, 1);
-            }
-            delete pool[key];
-        }
         */
         var item = hash.get(oldItem);
         if (item) {
@@ -472,7 +475,7 @@ app.factory('Hash', [function() {
             if (index !== -1) {
                 hash.splice(index, 1);
             }
-            pool[item[key]] = null;
+            // pool[item[key]] = null;
             delete pool[item[key]];
         }
         return hash;
@@ -505,20 +508,30 @@ app.factory('Hash', [function() {
     }
 
     function removeAll() {
-        var hash = this;
+        var hash = this,
+            key = hash.key,
+            pool = hash.pool;
+        var i = 0,
+            t = hash.length,
+            item;
+        while (hash.length) {
+            item = hash.shift();
+            delete pool[item[key]];
+            i++;
+        }
+        /*
         var list = hash.slice();
         while (list.length) {
             var item = list.pop();
-            if (hash.key === 'key') {
-                console.log('remove', item, item[this.key]);
-            }
             hash.remove(item);
         };
+        */
         /*
         while (hash.length) {
             hash.remove(hash[0]);
         }
         */
+        // for (var i = 0, keys = Object.keys(object); i < keys.length; i++) { }
         return hash;
     }
 

@@ -48,14 +48,28 @@
             </section>
         </div>
     </div>
-    <section>
-        <h3>Row</h3>
-        <json-formatter json="row"></json-formatter>
-    </section>
-    <section>
-        <h3>Item</h3>
-        <code ng-bind="item | json"></code>
-    </section>
+    <div class="row">
+        <div class="col-sm-6">
+            <section>
+                <h3>Tasks</h3>
+                <json-formatter json="row.tasks"></json-formatter>
+            </section>
+            <section>
+                <h3>Tasks.Pool</h3>
+                <json-formatter json="row.tasks.pool"></json-formatter>
+            </section>
+        </div>
+        <div class="col-sm-6">
+            <section>
+                <h3>Row</h3>
+                <json-formatter json="row"></json-formatter>
+            </section>
+            <section>
+                <h3>Item</h3>
+                <code ng-bind="item | json"></code>
+            </section>
+        </div>
+    </div>
     <section>
         <h3>Log</h3>
         <code ng-bind="log | json"></code>
