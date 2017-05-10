@@ -108,7 +108,7 @@ app.controller('DemoCtrl', ['$scope', '$interval', 'Hash', 'Calendar', 'GanttRow
             activityId: row.id,
         };
         if (Math.floor(Math.random() * 3) == 0) {
-            item.taskId = 10000 + Math.floor(Math.random() * 3);
+            item.taskId = 10000 + Math.floor(Math.random() * 50);
         }
         return item;
     }
@@ -407,12 +407,12 @@ app.factory('Hash', [function() {
         });
     }
 
-    function has(key) {
-        return this.pool[key] !== undefined;
+    function has(id) {
+        return this.pool[id] !== undefined;
     }
 
-    function getId(key) {
-        return this.pool[key];
+    function getId(id) {
+        return this.pool[id];
     }
 
     function get(item) {
@@ -445,12 +445,34 @@ app.factory('Hash', [function() {
         var hash = this,
             pool = this.pool,
             key = this.key;
+        var index = -1;
+        hash.each(function(item, i) {
+            if (item[key] === oldItem[key]) {
+                index = i;
+            }
+        });
+        if (index !== -1) {
+            hash.splice(index, 1);
+            delete pool[oldItem[key]];
+        }
+        /*
+        if (oldItem) {
+            key = oldItem[key];
+            oldItem = pool[key];
+            var index = hash.indexOf(oldItem);
+            if (index !== -1) {
+                hash.splice(index, 1);
+            }
+            delete pool[key];
+        }
+        */
         var item = hash.get(oldItem);
         if (item) {
             var index = hash.indexOf(item);
             if (index !== -1) {
                 hash.splice(index, 1);
             }
+            pool[item[key]] = null;
             delete pool[item[key]];
         }
         return hash;
@@ -483,12 +505,20 @@ app.factory('Hash', [function() {
     }
 
     function removeAll() {
-        var hash = this,
-            list = this.slice();
+        var hash = this;
+        var list = hash.slice();
         while (list.length) {
             var item = list.pop();
+            if (hash.key === 'key') {
+                console.log('remove', item, item[this.key]);
+            }
             hash.remove(item);
         };
+        /*
+        while (hash.length) {
+            hash.remove(hash[0]);
+        }
+        */
         return hash;
     }
 
