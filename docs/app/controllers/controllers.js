@@ -121,6 +121,7 @@ app.controller('DemoCtrl', ['$scope', '$interval', 'Hash', 'Calendar', 'GanttRow
     }
 }]);
 
+
 app.constant('ganttGroups', {
     ACTIVITY: 1,
     CUSTOMER: 2,
@@ -131,265 +132,6 @@ app.constant('ganttGroups', {
     RESOURCE: 7,
     USER: 9,
 });
-
-app.factory('GanttRow', ['Hash', 'Calendar', 'ganttGroups', function(Hash, Calendar, ganttGroups) {
-    const oneday = (24 * 60 * 60 * 1000);
-    var today = new Date();
-    today.setHours(0);
-    today.setMinutes(0);
-    today.setSeconds(0);
-    var todayKey = Math.ceil(today.getTime() / oneday);
-
-    function GanttRow(data, colors) {
-        this.type = ganttGroups.ACTIVITY;
-        this.color = colors[this.color || 0];
-        this.assignedHours = 0;
-        this.slots = new Hash('id');
-        this.days = new Hash('key');
-        this.months = new Hash('mKey');
-        this.ranges = new Hash('rKey');
-        this.tasks = new Hash('taskId');
-        // angular.isObject(data) ? angular.extend(this, data) : null;
-        if (data) {
-            this.id = data.activity.id;
-            this.name = data.activity.name;
-            this.budgetHours = data.activity.budgetHours;
-            this.useBudget = data.project.type !== 2 && data.project.type !== 4;
-            this.customer = data.customer;
-            this.department = data.department;
-            this.manager = data.manager;
-            this.project = data.project;
-            this.resource = data.resource;
-        }
-        // this.items = new Hash().fill(data.items);
-        this.update();
-    }
-    GanttRow.prototype = {
-        merge: function(slot) {
-            var slots = this.slots;
-            slot.hours ? slots.add(slot) : slots.remove(slot);
-        },
-        update: function() {
-            var total = 0;
-            var slots = this.slots,
-                days = this.days;
-            days.removeAll();
-            slots.each(function(item) {
-                total += item ? item.hours : 0;
-                var day = days.add({
-                    key: item.key,
-                    date: item.date,
-                    hours: 0,
-                });
-                day.tasks = day.tasks || new Hash('taskId');
-                day.tasks.add(angular.copy(item));
-                day.tasks.each(function(task) {
-                    day.hours += task.hours;
-                });
-            });
-            days.forward(); // sort by key       
-            this.assignedHours = total;
-            this.updateRanges();
-        },
-        updateMonths: function() {
-            var days = this.days,
-                months = this.months;
-            months.removeAll();
-            var previous;
-            days.each(function(item) {
-                var month = Calendar.getMonth(item);
-                if (month !== previous) {
-                    previous = month;
-                    Calendar.clearMonth(month);
-                }
-                months.add(month);
-                var day = month.days.getId(item.key);
-                if (day) {
-                    day.hours = item.hours;
-                    day.tasks = item.tasks;
-                }
-            });
-            months.forward(); // sort by key  
-        },
-        updateRanges: function() {
-            var days = this.days,
-                ranges = this.ranges;
-            ranges.removeAll();
-            var rKey = 0,
-                lastDay;
-            days.each(function(day, i) {
-                if (lastDay) {
-                    if (day.key - lastDay.key > 1 || day.tasks.differs(lastDay.tasks)) {
-                        rKey++;
-                    }
-                }
-                lastDay = day;
-                var range = ranges.add({
-                    rKey: rKey,
-                });
-                range.days = range.days || [];
-                range.days.push(day.key);
-            });
-            ranges.forward(); // sort by key   
-        },
-        getRange: function(col, from, to) {
-            var ranges = this.ranges,
-                range = null,
-                key = col.$key;
-            ranges.each(function(item) {
-                var index = item.days.indexOf(key);
-                if (index !== -1) {
-                    item.c = index;
-                    item.firstKey = Math.max(from, item.days[0]);
-                    item.lastKey = Math.min(to, item.days[item.days.length - 1]);
-                    range = item;
-                }
-            });
-            return range;
-        },
-        updateRange: function(col, from, to) {
-            var ranges = this.ranges,
-                range = this.getRange(col, from, to);
-            if (range) {
-                range.previousKey = null;
-                range.nextKey = null;
-                var r = range.rKey;
-                if (r > 0) {
-                    var p = ranges[r - 1];
-                    range.previousKey = p.days[p.days.length - 1];
-                }
-                if (r < ranges.length - 1) {
-                    var n = ranges[r + 1];
-                    range.nextKey = n.days[0];
-                }
-            }
-            return range;
-        },
-        canMoveRange: function(range, dir) {
-            // rifare !!!
-            var can = true;
-            var row = this;
-            var first = range.items[0];
-            var last = range.items[range.items.length - 1];
-            var key = row.getOffsetKey(first.startDate, dir);
-            var i = 0,
-                t = range.items.length;
-            while (i < t) {
-                var k = key + i;
-                if (k < todayKey || (row.days.getId(k) && range.items.indexOf(row.days.getId(k)) === -1)) { // sistemare!!
-                    can = false;
-                    i = t;
-                }
-                i++;
-            }
-            return can;
-        },
-        moveRange: function(range, dir) {
-            if (range.items.length) {
-                var row = this;
-                if (row.canMoveRange(range, dir)) {
-                    angular.forEach(range.items, function(item) {
-                        row.addDays(item, dir);
-                    });
-                    row.update();
-                }
-            }
-        },
-        assign: function(col, value) {
-            console.log('assign');
-            var slots = this.slots,
-                key = col.$key;
-            var item = {
-                // errore
-                key: key,
-                date: col.$date,
-                hours: value || 0,
-                activityId: this.id,
-            };
-            value ? slots.add(item) : slots.remove(item);
-            this.update();
-            return this.days.getId(key);
-        },
-        write: function(col, value, max) {
-            value = Math.min(value, max);
-            this.useBudget ? value = Math.min(value, this.budgetHours - this.assignedHours) : null;
-            value = Math.max(0, value);
-            if (value && !this.days.has(col.$key) && col.$date >= today) {
-                return this.assign(col, value);
-            }
-        },
-        erase: function(col, value, max) {
-            if (this.days.has(col.$key) && col.$date >= today) {
-                return this.assign(col, null);
-            }
-        },
-        toggle: function(col, value, max) {
-            if (this.days.has(col.$key)) {
-                return this.erase(col, value, max);
-            } else {
-                return this.write(col, value, max);
-            }
-        },
-        addDays: function(item, days) {
-            // console.log('GanttRow.addDay', item, days);
-            var date = new Date(item.startDate);
-            date.setDate(date.getDate() + days);
-            item.date = date;
-            item.key = Math.ceil(date.getTime() / oneday);
-            return item;
-        },
-        getOffsetKey: function(date, day) {
-            var date = new Date(date);
-            date.setDate(date.getDate() + day);
-            var key = Math.ceil(date.getTime() / oneday);
-            return key;
-        },
-        getHours: function(key) {
-            var hours = 0;
-            var day = this.days.getId(key);
-            if (day) {
-                day.tasks.each(function(task) {
-                    hours += task.hours;
-                });
-            }
-            return hours;
-        },
-        toggleOpened: function() {
-            // console.log('toggleOpened');
-            this.opened = !this.opened;
-        },
-        compress: function(key) {
-            if (!this.items.length) {
-                return;
-            }
-            this.items.sort(function(a, b) {
-                return a.key - b.key;
-            });
-            var item = null; // Utils.where(this.items, { key: key });
-            item = item || this.items[0];
-            var index = this.items.indexOf(item);
-            var i = index,
-                t = this.items.length;
-            key = Math.max(key, todayKey);
-            // da rifare
-            // collezionare ore totali
-            // redistribuire records in base a carico giornaliero
-            // spostare su gantt
-            while (i < t) {
-                var item = this.items[i];
-                item.key = key + i - index;
-                item.date = new Date(item.key * oneday);
-                i++;
-            }
-            this.update();
-        },
-    }
-    GanttRow.serialNumber = function(number, max) {
-        return new Array((1 + (max.toString().length) - (number.toString().length))).join('0');
-    };
-    return GanttRow;
-}]);
-
 
 app.factory('Hash', [function() {
     var pools = {};
@@ -417,11 +159,11 @@ app.factory('Hash', [function() {
     }
 
     function has(id) {
-        return this.pool[id + ''] !== undefined;
+        return this.pool[id] !== undefined;
     }
 
     function getId(id) {
-        return this.pool[id + ''];
+        return this.pool[id];
     }
 
     function get(item) {
@@ -434,7 +176,7 @@ app.factory('Hash', [function() {
         var hash = this,
             pool = this.pool,
             key = this.key;
-        pool[item[key] + ''] = item;
+        pool[item[key]] = item;
         hash.push(item);
         return item;
     }
@@ -457,25 +199,12 @@ app.factory('Hash', [function() {
         var hash = this,
             pool = this.pool,
             key = this.key;
-        /*
-        var index = -1;
-        hash.each(function(item, i) {
-            if (item[key] === oldItem[key]) {
-                index = i;
-            }
-        });
-        if (index !== -1) {
-            hash.splice(index, 1);
-            delete pool[oldItem[key]];
-        }
-        */
         var item = hash.get(oldItem);
         if (item) {
             var index = hash.indexOf(item);
             if (index !== -1) {
                 hash.splice(index, 1);
             }
-            // pool[item[key]] = null;
             delete pool[item[key]];
         }
         return hash;
@@ -519,19 +248,6 @@ app.factory('Hash', [function() {
             delete pool[item[key]];
             i++;
         }
-        /*
-        var list = hash.slice();
-        while (list.length) {
-            var item = list.pop();
-            hash.remove(item);
-        };
-        */
-        /*
-        while (hash.length) {
-            hash.remove(hash[0]);
-        }
-        */
-        // for (var i = 0, keys = Object.keys(object); i < keys.length; i++) { }
         return hash;
     }
 
@@ -705,4 +421,317 @@ app.factory('Calendar', ['Hash', function(Hash) {
         return Math.ceil(date.getTime() / oneday);
     };
     return Calendar;
+}]);
+
+app.factory('GanttRow', ['Hash', 'Calendar', 'ganttGroups', function(Hash, Calendar, ganttGroups) {
+    var uid = 1;
+
+    const oneday = (24 * 60 * 60 * 1000);
+    var today = new Date();
+    today.setHours(0);
+    today.setMinutes(0);
+    today.setSeconds(0);
+    var todayKey = Math.ceil(today.getTime() / oneday);
+
+    function GanttRow(data, colors) {
+        this.type = ganttGroups.ACTIVITY;
+        this.assignedHours = 0;
+        this.slots = new Hash('id');
+        this.days = new Hash('key');
+        this.months = new Hash('mKey');
+        this.ranges = new Hash('rKey');
+        this.tasks = new Hash('id'); // 'taskId'
+        // angular.isObject(data) ? angular.extend(this, data) : null;
+        if (data) {
+            this.id = data.activity.id;
+            this.name = data.activity.name;
+            this.budgetHours = data.activity.budgetHours;
+            this.useBudget = data.project.type !== 2 && data.project.type !== 4;
+            this.customer = data.customer;
+            this.department = data.department;
+            this.manager = data.manager;
+            this.project = data.project;
+            this.resource = data.resource;
+            this.color = colors[this.id % (colors.length || 1)];
+        }
+        // this.items = new Hash().fill(data.items);
+        this.lastTaskId = null;
+        this.update();
+    }
+    GanttRow.prototype = {
+        canSelect: function() {
+            return this.type === ganttGroups.ACTIVITY && this.budgetHours > 0;
+        },
+        canEdit: function() {
+            return this.canSelect() && this.resource.name.toLowerCase().indexOf('nondefinito') === -1;
+        },
+        mergeSlot: function(slot) {
+            var slots = this.slots;
+            slot.hours ? slots.add(slot) : slots.remove(slot);
+        },
+        insertSlot: function(key, hours, taskId) {
+            var slot = null;
+            this.useBudget ? hours = Math.min(hours, this.budgetHours - this.assignedHours) : null;
+            hours = Math.max(0, hours);
+            if (hours > 0) {
+                var item = {
+                    id: 'temp-' + (uid++),
+                    key: key,
+                    date: new Date(key * oneday),
+                    hours: hours,
+                    activityId: this.id,
+                };
+                if (taskId) {
+                    item.taskId = taskId;
+                    this.lastTaskId = taskId;
+                }
+                this.slots.add(item);
+                slot = this.slots.getId(item.id);
+            }
+            this.update();
+            return slot;
+        },
+        removeSlots: function(key) {
+            var day = this.days.getId(key);
+            day.tasks.each(function(item) {
+                item.hours = 0;
+            });
+            var slots = day.tasks.slice();
+            this.slots.removeMany(slots);
+            this.update();
+            return slots;
+        },
+        toggleSlots: function(key, hours) {
+            if (this.days.has(key)) {
+                return this.removeSlots(key);
+            } else {
+                var slot = this.insertSlot(key, hours, this.lastTaskId);
+                return [slot];
+            }
+        },
+        // WRITE CANCEL DAY SLOT
+        assign: function(col, value) {
+            console.log('assign');
+            var slots = this.slots,
+                key = col.$key;
+            var item = {
+                // errore
+                id: 'temp-' + (uid++),
+                key: key,
+                date: col.$date,
+                hours: value || 0,
+                activityId: this.id,
+            };
+            value ? slots.add(item) : slots.remove(item);
+            this.update();
+            return this.days.getId(key);
+        },
+        write: function(col, value, max) {
+            value = Math.min(value, max);
+            this.useBudget ? value = Math.min(value, this.budgetHours - this.assignedHours) : null;
+            value = Math.max(0, value);
+            if (value && !this.days.has(col.$key) && col.$date >= today) {
+                return this.assign(col, value);
+            }
+        },
+        erase: function(col, value, max) {
+            if (this.days.has(col.$key) && col.$date >= today) {
+                return this.assign(col, null);
+            }
+        },
+        toggle: function(col, value, max) {
+            if (this.days.has(col.$key)) {
+                return this.erase(col, value, max);
+            } else {
+                return this.write(col, value, max);
+            }
+        },
+        // WRITE CANCEL DAY SLOT
+        update: function() {
+            var total = 0;
+            var slots = this.slots,
+                days = this.days;
+            days.removeAll();
+            var taskId = null;
+            slots.each(function(item) {
+                taskId = item.taskId || taskId;
+                total += item ? item.hours : 0;
+                var day = days.add({
+                    key: item.key,
+                    date: item.date,
+                    hours: 0,
+                });
+                day.tasks = day.tasks || new Hash('id'); // 'taskId'
+                day.tasks.add(angular.copy(item));
+                day.tasks.each(function(task) {
+                    day.hours += task.hours;
+                });
+            });
+            this.lastTaskId = taskId || this.lastTaskId;
+            days.forward(); // sort by key       
+            this.assignedHours = total;
+            this.updateRanges();
+        },
+        updateMonths: function() {
+            var days = this.days,
+                months = this.months;
+            months.removeAll();
+            var previous;
+            days.each(function(item) {
+                var month = Calendar.getMonth(item);
+                if (month !== previous) {
+                    previous = month;
+                    Calendar.clearMonth(month);
+                }
+                months.add(month);
+                var day = month.days.getId(item.key);
+                if (day) {
+                    day.hours = item.hours;
+                    day.tasks = item.tasks;
+                }
+            });
+            months.forward(); // sort by key  
+        },
+        updateRanges: function() {
+            var days = this.days,
+                ranges = this.ranges;
+            ranges.removeAll();
+            var rKey = 0,
+                lastDay;
+            days.each(function(day, i) {
+                if (lastDay) {
+                    if (day.key - lastDay.key > 1 || day.tasks.differs(lastDay.tasks)) {
+                        rKey++;
+                    }
+                }
+                lastDay = day;
+                var range = ranges.add({
+                    rKey: rKey,
+                });
+                range.days = range.days || [];
+                range.days.push(day.key);
+            });
+            ranges.forward(); // sort by key   
+        },
+        getRange: function(col, from, to) {
+            var ranges = this.ranges,
+                range = null,
+                key = col.$key;
+            ranges.each(function(item) {
+                var index = item.days.indexOf(key);
+                if (index !== -1) {
+                    item.c = index;
+                    item.firstKey = Math.max(from, item.days[0]);
+                    item.lastKey = Math.min(to, item.days[item.days.length - 1]);
+                    range = item;
+                }
+            });
+            return range;
+        },
+        updateRange: function(col, from, to) {
+            var ranges = this.ranges,
+                range = this.getRange(col, from, to);
+            if (range) {
+                range.previousKey = null;
+                range.nextKey = null;
+                var r = range.rKey;
+                if (r > 0) {
+                    var p = ranges[r - 1];
+                    range.previousKey = p.days[p.days.length - 1];
+                }
+                if (r < ranges.length - 1) {
+                    var n = ranges[r + 1];
+                    range.nextKey = n.days[0];
+                }
+            }
+            return range;
+        },
+        canMoveRange: function(range, dir) {
+            // rifare !!!
+            var can = true;
+            var row = this;
+            var first = range.items[0];
+            var last = range.items[range.items.length - 1];
+            var key = row.getOffsetKey(first.startDate, dir);
+            var i = 0,
+                t = range.items.length;
+            while (i < t) {
+                var k = key + i;
+                if (k < todayKey || (row.days.getId(k) && range.items.indexOf(row.days.getId(k)) === -1)) { // sistemare!!
+                    can = false;
+                    i = t;
+                }
+                i++;
+            }
+            return can;
+        },
+        moveRange: function(range, dir) {
+            if (range.items.length) {
+                var row = this;
+                if (row.canMoveRange(range, dir)) {
+                    angular.forEach(range.items, function(item) {
+                        row.addDays(item, dir);
+                    });
+                    row.update();
+                }
+            }
+        },
+        addDays: function(item, days) {
+            // console.log('GanttRow.addDay', item, days);
+            var date = new Date(item.startDate);
+            date.setDate(date.getDate() + days);
+            item.date = date;
+            item.key = Math.ceil(date.getTime() / oneday);
+            return item;
+        },
+        getOffsetKey: function(date, day) {
+            var date = new Date(date);
+            date.setDate(date.getDate() + day);
+            var key = Math.ceil(date.getTime() / oneday);
+            return key;
+        },
+        getHours: function(key) {
+            var hours = 0;
+            var day = this.days.getId(key);
+            if (day) {
+                day.tasks.each(function(task) {
+                    hours += task.hours;
+                });
+            }
+            return hours;
+        },
+        toggleOpened: function() {
+            // console.log('toggleOpened');
+            this.opened = !this.opened;
+        },
+        compress: function(key) {
+            if (!this.items.length) {
+                return;
+            }
+            this.items.sort(function(a, b) {
+                return a.key - b.key;
+            });
+            var item = Utils.where(this.items, { key: key });
+            item = item || this.items[0];
+            var index = this.items.indexOf(item);
+            var i = index,
+                t = this.items.length;
+            key = Math.max(key, todayKey);
+            // da rifare
+            // collezionare ore totali
+            // redistribuire records in base a carico giornaliero
+            // spostare su gantt
+            while (i < t) {
+                var item = this.items[i];
+                item.key = key + i - index;
+                item.date = new Date(item.key * oneday);
+                i++;
+            }
+            this.update();
+        },
+    }
+    GanttRow.serialNumber = function(number, max) {
+        return new Array((1 + (max.toString().length) - (number.toString().length))).join('0');
+    };
+    return GanttRow;
 }]);
